@@ -1,3 +1,4 @@
+#Problem Statement: To Count the number of fingers on your right hand.
 import cv2
 import mediapipe as mp
 
@@ -42,4 +43,5 @@ while cap.isOpened():
 
 cap.release()
 cv2.destroyAllWindows()
+
 
