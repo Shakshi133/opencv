@@ -1,0 +1,88 @@
+import cv2
+import mediapipe as mp
+import numpy as np
+import math
+import time
+import screen_brightness_control as sbc  # For brightness control
+
+# Mediapipe setup
+mp_hands = mp.solutions.hands
+mp_drawing = mp.solutions.drawing_utils
+hands = mp_hands.Hands(min_detection_confidence=0.7, min_tracking_confidence=0.7)
+
+cap = cv2.VideoCapture(0)  # Try 1 or 2 if 0 doesn't work
+
+# Check if camera opened
+if not cap.isOpened():
+    print("Error: Could not open webcam.")
+    exit()
+
+# Timer setup
+start_time = time.time()
+BRIGHTNESS_CONTROL_DURATION = 60  # seconds
+brightness_enabled = True
+
+while True:
+    success, img = cap.read()
+
+    if not success or img is None:
+        print("Warning: Failed to grab frame from webcam.")
+        continue
+
+    img = cv2.flip(img, 1)
+    imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    results = hands.process(imgRGB)
+
+    current_time = time.time()
+    if current_time - start_time > BRIGHTNESS_CONTROL_DURATION:
+        brightness_enabled = False
+
+    if results.multi_hand_landmarks:
+        for handLms in results.multi_hand_landmarks:
+            lmList = []
+            for id, lm in enumerate(handLms.landmark):
+                h, w, _ = img.shape
+                cx, cy = int(lm.x * w), int(lm.y * h)
+                lmList.append((id, cx, cy))
+
+            if lmList:
+                x1, y1 = lmList[4][1], lmList[4][2]   # Thumb tip
+                x2, y2 = lmList[8][1], lmList[8][2]   # Index tip
+
+                # Draw circles and line
+                cv2.circle(img, (x1, y1), 15, (255, 0, 255), cv2.FILLED)
+                cv2.circle(img, (x2, y2), 15, (255, 0, 255), cv2.FILLED)
+                cv2.line(img, (x1, y1), (x2, y2), (0, 255, 0), 3)
+
+                # Distance between fingers
+                length = math.hypot(x2 - x1, y2 - y1)
+
+                if brightness_enabled:
+                    # Map length to brightness [0, 100]
+                    brightness = int(np.interp(length, [50, 250], [0, 100]))
+                    sbc.set_brightness(brightness)
+
+                    # Brightness bar and percentage
+                    bright_bar = np.interp(length, [50, 250], [400, 150])
+                    cv2.rectangle(img, (50, 150), (85, 400), (0, 255, 0), 3)
+                    cv2.rectangle(img, (50, int(bright_bar)), (85, 400), (0, 255, 0), cv2.FILLED)
+                    cv2.putText(img, f'{brightness} %', (40, 430), cv2.FONT_HERSHEY_SIMPLEX,
+                                1, (255, 0, 0), 2)
+                else:
+                    # Timer expired
+                    cv2.putText(img, "Brightness control expired", (200, 50), cv2.FONT_HERSHEY_SIMPLEX,
+                                1, (0, 0, 255), 2)
+
+            # Draw hand landmarks
+            mp_drawing.draw_landmarks(img, handLms, mp_hands.HAND_CONNECTIONS)
+
+    # Display window
+    cv2.imshow("Hand Brightness Control", img)
+
+    # Exit on ESC
+    if cv2.waitKey(1) & 0xFF == 27:
+        break
+
+# Release resources
+cap.release()
+cv2.destroyAllWindows()
