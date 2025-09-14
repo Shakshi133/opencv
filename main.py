@@ -1,3 +1,5 @@
+#Problem Statement: To control gestures based on the your fingers.
+#Please refer to filters.py and gesture.py before executing this file.
 import cv2
 from filters import apply_filter
 from Gesture import detect
@@ -52,3 +54,4 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
+
